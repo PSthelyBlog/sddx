@@ -1,0 +1,43 @@
+scenario: memory_accumulate
+narrative: "M+ twice with different values: 5 then 3 → memory holds 8"
+
+setup:
+  - create: Calculator("s1")
+    context:
+      session_id: "s1"
+      accumulator: 0.0
+      pending_operator: null
+      current_operand: ""
+      display: "0"
+  - create: MemoryRegister("s1")
+    context:
+      session_id: "s1"
+      memory: 0.0
+  - create: OperationLog("s1")
+    context:
+      session_id: "s1"
+      entries: []
+
+steps:
+  - fire: Calculator("s1").input_digit
+    args: { digit: "5" }
+  - fire: Calculator("s1").request_memory_add
+  - assert:
+      states:
+        MemoryRegister("s1"): holding
+  - fire: Calculator("s1").clear
+  - fire: Calculator("s1").input_digit
+    args: { digit: "3" }
+  - fire: Calculator("s1").request_memory_add
+  - fire: Calculator("s1").clear
+  - fire: Calculator("s1").request_memory_recall
+
+expect:
+  states:
+    Calculator("s1"): entering_first
+    MemoryRegister("s1"): holding
+  events_emitted:
+    - calc.memory_add_requested
+    - memory.updated
+    - memory.recalled
+    - calc.value_loaded

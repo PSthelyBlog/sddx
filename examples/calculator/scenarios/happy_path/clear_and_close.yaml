@@ -1,0 +1,43 @@
+scenario: clear_and_close
+narrative: "Mid-calculation clear resets to idle, then close ends the session"
+
+setup:
+  - create: Calculator("s1")
+    context:
+      session_id: "s1"
+      accumulator: 0.0
+      pending_operator: null
+      current_operand: ""
+      display: "0"
+  - create: OperationLog("s1")
+    context:
+      session_id: "s1"
+      entries: []
+
+steps:
+  - fire: Calculator("s1").input_digit
+    args: { digit: "4" }
+  - fire: Calculator("s1").select_operator
+    args: { operator: "+" }
+  - fire: Calculator("s1").input_digit
+    args: { digit: "9" }
+  - fire: Calculator("s1").clear
+  - assert:
+      states:
+        Calculator("s1"): idle
+  - fire: Calculator("s1").input_digit
+    args: { digit: "1" }
+  - fire: Calculator("s1").select_operator
+    args: { operator: "+" }
+  - fire: Calculator("s1").input_digit
+    args: { digit: "1" }
+  - fire: Calculator("s1").compute
+  - fire: Calculator("s1").close
+
+expect:
+  states:
+    Calculator("s1"): closed
+    OperationLog("s1"): closed
+  events_emitted:
+    - calc.cleared
+    - calc.closed

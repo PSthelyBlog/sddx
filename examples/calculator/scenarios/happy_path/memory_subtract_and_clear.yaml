@@ -1,0 +1,47 @@
+scenario: memory_subtract_and_clear
+narrative: "MS 10, M- 3 → memory=7. MC empties memory back to 0."
+
+setup:
+  - create: Calculator("s1")
+    context:
+      session_id: "s1"
+      accumulator: 0.0
+      pending_operator: null
+      current_operand: ""
+      display: "0"
+  - create: MemoryRegister("s1")
+    context:
+      session_id: "s1"
+      memory: 0.0
+  - create: OperationLog("s1")
+    context:
+      session_id: "s1"
+      entries: []
+
+steps:
+  - fire: Calculator("s1").input_digit
+    args: { digit: "1" }
+  - fire: Calculator("s1").input_digit
+    args: { digit: "0" }
+  - fire: Calculator("s1").request_memory_set
+  - assert:
+      states:
+        MemoryRegister("s1"): holding
+  - fire: Calculator("s1").clear
+  - fire: Calculator("s1").input_digit
+    args: { digit: "3" }
+  - fire: Calculator("s1").request_memory_subtract
+  - fire: Calculator("s1").request_memory_clear
+  - assert:
+      states:
+        MemoryRegister("s1"): empty
+
+expect:
+  states:
+    MemoryRegister("s1"): empty
+  events_emitted:
+    - calc.memory_set_requested
+    - calc.memory_subtract_requested
+    - calc.memory_clear_requested
+    - memory.updated
+    - memory.cleared

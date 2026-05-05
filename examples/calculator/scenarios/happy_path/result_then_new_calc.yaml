@@ -1,0 +1,41 @@
+scenario: result_then_new_calc
+narrative: "After a result, typing a digit starts a fresh calculation (discards prior accumulator)"
+
+setup:
+  - create: Calculator("s1")
+    context:
+      session_id: "s1"
+      accumulator: 0.0
+      pending_operator: null
+      current_operand: ""
+      display: "0"
+  - create: OperationLog("s1")
+    context:
+      session_id: "s1"
+      entries: []
+
+steps:
+  - fire: Calculator("s1").input_digit
+    args: { digit: "9" }
+  - fire: Calculator("s1").select_operator
+    args: { operator: "+" }
+  - fire: Calculator("s1").input_digit
+    args: { digit: "1" }
+  - fire: Calculator("s1").compute
+  - assert:
+      states:
+        Calculator("s1"): result_shown
+  - fire: Calculator("s1").input_digit
+    args: { digit: "7" }
+  - assert:
+      states:
+        Calculator("s1"): entering_first
+  - fire: Calculator("s1").select_operator
+    args: { operator: "-" }
+  - fire: Calculator("s1").input_digit
+    args: { digit: "2" }
+  - fire: Calculator("s1").compute
+
+expect:
+  states:
+    Calculator("s1"): result_shown

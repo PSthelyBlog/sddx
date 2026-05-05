@@ -1,0 +1,37 @@
+scenario: chained_left_to_right
+narrative: "2 + 3 * 4 evaluates left-to-right as (2+3)*4 = 20"
+
+setup:
+  - create: Calculator("s1")
+    context:
+      session_id: "s1"
+      accumulator: 0.0
+      pending_operator: null
+      current_operand: ""
+      display: "0"
+  - create: OperationLog("s1")
+    context:
+      session_id: "s1"
+      entries: []
+
+steps:
+  - fire: Calculator("s1").input_digit
+    args: { digit: "2" }
+  - fire: Calculator("s1").select_operator
+    args: { operator: "+" }
+  - fire: Calculator("s1").input_digit
+    args: { digit: "3" }
+  - fire: Calculator("s1").select_operator
+    args: { operator: "*" }
+  - assert:
+      states:
+        Calculator("s1"): operator_pending
+  - fire: Calculator("s1").input_digit
+    args: { digit: "4" }
+  - fire: Calculator("s1").compute
+
+expect:
+  states:
+    Calculator("s1"): result_shown
+  events_emitted:
+    - calc.computed

@@ -1,0 +1,56 @@
+scenario: memory_store_recall
+narrative: "Compute 7, MS, clear, then MR puts 7 back as the operand"
+
+setup:
+  - create: Calculator("s1")
+    context:
+      session_id: "s1"
+      accumulator: 0.0
+      pending_operator: null
+      current_operand: ""
+      display: "0"
+  - create: MemoryRegister("s1")
+    context:
+      session_id: "s1"
+      memory: 0.0
+  - create: OperationLog("s1")
+    context:
+      session_id: "s1"
+      entries: []
+
+steps:
+  - fire: Calculator("s1").input_digit
+    args: { digit: "3" }
+  - fire: Calculator("s1").select_operator
+    args: { operator: "+" }
+  - fire: Calculator("s1").input_digit
+    args: { digit: "4" }
+  - fire: Calculator("s1").compute
+  - assert:
+      states:
+        Calculator("s1"): result_shown
+  - fire: Calculator("s1").request_memory_set
+  - assert:
+      states:
+        MemoryRegister("s1"): holding
+  - fire: Calculator("s1").clear
+  - fire: Calculator("s1").request_memory_recall
+  - assert:
+      states:
+        Calculator("s1"): entering_first
+  - fire: Calculator("s1").select_operator
+    args: { operator: "*" }
+  - fire: Calculator("s1").input_digit
+    args: { digit: "2" }
+  - fire: Calculator("s1").compute
+
+expect:
+  states:
+    Calculator("s1"): result_shown
+    MemoryRegister("s1"): holding
+  events_emitted:
+    - calc.memory_set_requested
+    - calc.memory_recall_requested
+    - memory.updated
+    - memory.recalled
+    - calc.value_loaded

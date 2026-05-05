@@ -1,0 +1,32 @@
+scenario: divide_by_zero_compute
+narrative: "5 / 0 = should land in error, not produce a result"
+
+setup:
+  - create: Calculator("s1")
+    context:
+      session_id: "s1"
+      accumulator: 0.0
+      pending_operator: null
+      current_operand: ""
+      display: "0"
+  - create: OperationLog("s1")
+    context:
+      session_id: "s1"
+      entries: []
+
+steps:
+  - fire: Calculator("s1").input_digit
+    args: { digit: "5" }
+  - fire: Calculator("s1").select_operator
+    args: { operator: "/" }
+  - fire: Calculator("s1").input_digit
+    args: { digit: "0" }
+  - fire: Calculator("s1").compute
+
+expect:
+  states:
+    Calculator("s1"): error
+  events_emitted:
+    - calc.errored
+  events_not_emitted:
+    - calc.computed

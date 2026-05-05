@@ -1,0 +1,38 @@
+scenario: operator_replace
+narrative: "Pressing two operators in a row replaces the pending operator without computing"
+
+setup:
+  - create: Calculator("s1")
+    context:
+      session_id: "s1"
+      accumulator: 0.0
+      pending_operator: null
+      current_operand: ""
+      display: "0"
+  - create: OperationLog("s1")
+    context:
+      session_id: "s1"
+      entries: []
+
+steps:
+  - fire: Calculator("s1").input_digit
+    args: { digit: "5" }
+  - fire: Calculator("s1").select_operator
+    args: { operator: "+" }
+  - assert:
+      states:
+        Calculator("s1"): operator_pending
+  - fire: Calculator("s1").select_operator
+    args: { operator: "-" }
+  - assert:
+      states:
+        Calculator("s1"): operator_pending
+  - fire: Calculator("s1").input_digit
+    args: { digit: "3" }
+  - fire: Calculator("s1").compute
+
+expect:
+  states:
+    Calculator("s1"): result_shown
+  events_emitted:
+    - calc.computed

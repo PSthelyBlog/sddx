@@ -1,0 +1,35 @@
+scenario: simple_addition
+narrative: "2 + 3 = 5"
+
+setup:
+  - create: Calculator("s1")
+    context:
+      session_id: "s1"
+      accumulator: 0.0
+      pending_operator: null
+      current_operand: ""
+      display: "0"
+  - create: OperationLog("s1")
+    context:
+      session_id: "s1"
+      entries: []
+
+steps:
+  - fire: Calculator("s1").input_digit
+    args: { digit: "2" }
+  - fire: Calculator("s1").select_operator
+    args: { operator: "+" }
+  - fire: Calculator("s1").input_digit
+    args: { digit: "3" }
+  - fire: Calculator("s1").compute
+
+expect:
+  states:
+    Calculator("s1"): result_shown
+    OperationLog("s1"): recording
+  events_emitted:
+    - calc.digit_appended
+    - calc.operator_selected
+    - calc.computed
+  events_not_emitted:
+    - calc.errored

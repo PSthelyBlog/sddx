@@ -88,7 +88,7 @@ tests/                # Framework unit tests (49 tests)
 ## Running the calculator example
 
 ```bash
-cd /Users/philippe/Desktop/sddx
+cd ./sddx
 PYTHONPATH=src python -m sddx -C examples/calculator converge
 ```
 

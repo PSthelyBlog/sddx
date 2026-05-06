@@ -1,0 +1,57 @@
+scenario: activation_exhausts_retries
+narrative: "All three attempts decline; PaymentAttempt exhausts; subscription suspends from pending."
+
+setup:
+  - create: SubscriptionLifecycle("sub_1")
+    context:
+      subscription_id: "sub_1"
+      customer_id: "cust_1"
+      plan_id: "pro_monthly"
+      amount: 29.99
+      billing_period_days: 30
+      grace_period_seconds: 604800
+  - create: OperationLog("sub_1")
+    context:
+      subscription_id: "sub_1"
+      entries: []
+  - create: FakePaymentProvider("provider")
+    context:
+      outcomes: ["decline", "decline", "decline"]
+      served: 0
+  - create: PaymentAttempt("sub_1:cycle1")
+    context:
+      retry_id: "sub_1:cycle1"
+      subscription_id: "sub_1"
+      cycle: 1
+      amount: 29.99
+      max_attempts: 3
+      base_delay: 60.0
+      attempts: 0
+
+steps:
+  - fire: PaymentAttempt("sub_1:cycle1").start
+  - assert:
+      states:
+        PaymentAttempt("sub_1:cycle1"): backing_off
+  - advance_time: 61    # past base_delay (60s) → second attempt
+  - assert:
+      states:
+        PaymentAttempt("sub_1:cycle1"): backing_off
+  - advance_time: 121   # past second backoff (120s) → third attempt
+  - assert:
+      states:
+        PaymentAttempt("sub_1:cycle1"): exhausted
+
+expect:
+  states:
+    SubscriptionLifecycle("sub_1"): suspended
+    PaymentAttempt("sub_1:cycle1"): exhausted
+  events_emitted:
+    - retry.exhausted
+    - subscription.suspended
+  events_not_emitted:
+    - subscription.activated
+    - payment.captured
+  context:
+    FakePaymentProvider("provider"):
+      served: 3

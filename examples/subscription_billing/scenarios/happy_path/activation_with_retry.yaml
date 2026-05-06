@@ -1,0 +1,53 @@
+scenario: activation_with_retry
+narrative: "First attempt declines; backoff; retry succeeds; subscription activates."
+
+setup:
+  - create: SubscriptionLifecycle("sub_1")
+    context:
+      subscription_id: "sub_1"
+      customer_id: "cust_1"
+      plan_id: "pro_monthly"
+      amount: 29.99
+      billing_period_days: 30
+  - create: OperationLog("sub_1")
+    context:
+      subscription_id: "sub_1"
+      entries: []
+  - create: FakePaymentProvider("provider")
+    context:
+      outcomes: ["decline", "succeed"]
+      served: 0
+  - create: PaymentAttempt("sub_1:cycle1")
+    context:
+      retry_id: "sub_1:cycle1"
+      subscription_id: "sub_1"
+      cycle: 1
+      amount: 29.99
+      max_attempts: 3
+      base_delay: 60.0
+      attempts: 0
+
+steps:
+  - fire: PaymentAttempt("sub_1:cycle1").start
+  - assert:
+      states:
+        PaymentAttempt("sub_1:cycle1"): backing_off
+        SubscriptionLifecycle("sub_1"): pending
+  - advance_time: 65    # past the 60-second base delay
+  - assert:
+      states:
+        PaymentAttempt("sub_1:cycle1"): succeeded
+        SubscriptionLifecycle("sub_1"): active
+
+expect:
+  states:
+    SubscriptionLifecycle("sub_1"): active
+    PaymentAttempt("sub_1:cycle1"): succeeded
+  events_emitted:
+    - payment.declined
+    - payment.captured
+    - retry.succeeded
+    - subscription.activated
+  context:
+    PaymentAttempt("sub_1:cycle1"):
+      attempts: 2

@@ -80,7 +80,8 @@ src/sddx/
 ├── timing.py       # VirtualClock
 ├── std/            # Opt-in machine stdlib
 └── __main__.py     # python -m sddx CLI
-examples/calculator/  # Canonical end-to-end demo (14 scenarios, 9 invariants)
+examples/calculator/             # Calculator demo (14 scenarios, 9 invariants)
+examples/subscription_billing/   # Billing demo with timers, retries, snapshot/restore (9 scenarios, 7 invariants)
 docs/                 # Documentation, indexed above
 tests/                # Framework unit tests (49 tests)
 ```
@@ -96,6 +97,7 @@ Expected output: `14/14 scenarios converged`, with 9 invariants passing each.
 
 ## Status
 
-- v0.1: Phase 1 ergonomics + Phase 2 capability (timers, snapshot/restore, context assertions, CLI). 49 framework tests passing. Calculator example fully converges.
+- **v0.1.1** (current): structural check now detects `set_timer`-emitted events; subscription billing example added.
+- v0.1: Phase 1 ergonomics + Phase 2 capability (timers, snapshot/restore, context assertions, CLI). 50 framework tests passing. Two examples (calculator, subscription billing) fully converge.
 - v0.2 (planned): event-payload schema validation, more stdlib machines (`RequestResponse`, `Budget`, `MockAdapter`).
 - Future: `sdd_agent` package for LM-Studio-class workloads. Separate repo, depends on sddx.

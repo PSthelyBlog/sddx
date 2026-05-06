@@ -86,6 +86,38 @@ def test_dead_letter_detected_when_no_subscriber():
     assert "noone.listens" in report.dead_letters
 
 
+def test_set_timer_events_detected_as_emissions():
+    """Events scheduled via self.set_timer() should not appear as phantom subs.
+
+    The structural check parses hooks for emit() calls; it must also recognize
+    set_timer() event names so timer-driven cascades don't show up as phantom
+    subscriptions to the convergence checker.
+    """
+    class Scheduler(StateMachine):
+        idle = State(initial=True)
+        scheduled = State()
+        elapsed = State(final=True)
+        schedule = idle.to(scheduled)
+        receive = scheduled.to(elapsed)
+
+        def on_transition_schedule(self):
+            self.set_timer("test.timer", 5.0, {"id": self._instance_id})
+            # Also use keyword form to verify both styles are detected.
+            self.set_timer(event_name="test.kw_timer", delay=10.0, payload={})
+
+        @classmethod
+        def subscriptions(cls):
+            return {"test.timer": "receive", "test.kw_timer": "receive"}
+
+    r = SimulationRunner()
+    r.register(Scheduler)
+    report = r.check()
+    # Without set_timer detection these would be phantom subscriptions.
+    assert "test.timer" not in report.phantom_subscriptions
+    assert "test.kw_timer" not in report.phantom_subscriptions
+    assert report.is_valid
+
+
 def test_telemetry_events_excluded_from_dead_letters():
     class TelemOnly(StateMachine):
         a = State(initial=True)

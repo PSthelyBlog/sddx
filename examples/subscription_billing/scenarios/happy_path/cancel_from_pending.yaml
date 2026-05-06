@@ -1,0 +1,34 @@
+scenario: cancel_from_pending
+narrative: "User cancels before any charge has been attempted."
+
+setup:
+  - create: SubscriptionLifecycle("sub_1")
+    context:
+      subscription_id: "sub_1"
+      customer_id: "cust_1"
+      plan_id: "pro_monthly"
+      amount: 29.99
+      billing_period_days: 30
+  - create: OperationLog("sub_1")
+    context:
+      subscription_id: "sub_1"
+      entries: []
+
+steps:
+  - assert:
+      states:
+        SubscriptionLifecycle("sub_1"): pending
+  - fire: SubscriptionLifecycle("sub_1").cancel
+    args:
+      cancellation_reason: "changed_mind"
+
+expect:
+  states:
+    SubscriptionLifecycle("sub_1"): cancelled
+    OperationLog("sub_1"): closed
+  events_emitted:
+    - subscription.cancelled
+  events_not_emitted:
+    - subscription.activated
+    - subscription.suspended
+    - retry.attempt_requested

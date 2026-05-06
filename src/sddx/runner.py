@@ -474,6 +474,13 @@ class SimulationRunner:
         }
 
     def _find_emitted_events(self, machine_class: type[StateMachine]) -> set[str]:
+        """Inspect side-effect hooks for `self.emit(...)` and `self.set_timer(...)`.
+
+        Both are sources of events on the bus: `emit` is direct, `set_timer`
+        schedules a deferred event whose name is the first argument. Treating
+        only `emit` calls as emissions made timer-scheduled events look like
+        phantom subscriptions.
+        """
         emitted_events: set[str] = set()
         method_prefixes = ("on_enter_", "on_exit_", "on_transition_")
         for attr_name in dir(machine_class):
@@ -489,13 +496,40 @@ class SimulationRunner:
             except (OSError, TypeError, SyntaxError):
                 continue
             for node in ast.walk(tree):
-                if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-                    if node.func.attr == "emit" and isinstance(node.func.value, ast.Name):
-                        if node.func.value.id == "self" and node.args:
-                            first_arg = node.args[0]
-                            if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str):
-                                emitted_events.add(first_arg.value)
+                if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+                    continue
+                if not (isinstance(node.func.value, ast.Name) and node.func.value.id == "self"):
+                    continue
+                event_name = self._extract_event_name(node)
+                if event_name is not None:
+                    emitted_events.add(event_name)
         return emitted_events
+
+    @staticmethod
+    def _extract_event_name(node: ast.Call) -> str | None:
+        """Pull the event-name string literal out of a self.emit / self.set_timer call.
+
+        Returns None if the method isn't one we track or the name isn't a
+        statically-resolvable string literal (dynamically-named events can't
+        be checked statically, so we silently skip them).
+        """
+        attr = node.func.attr  # type: ignore[union-attr]
+        if attr == "emit":
+            literal = node.args[0] if node.args else None
+        elif attr == "set_timer":
+            # set_timer(event_name=..., delay=..., payload=...) — first
+            # positional or the `event_name` keyword.
+            literal = node.args[0] if node.args else None
+            if literal is None:
+                for kw in node.keywords:
+                    if kw.arg == "event_name":
+                        literal = kw.value
+                        break
+        else:
+            return None
+        if isinstance(literal, ast.Constant) and isinstance(literal.value, str):
+            return literal.value
+        return None
 
     def _telemetry_events(self) -> set[str]:
         """Aggregate telemetry events declared by all registered machines."""

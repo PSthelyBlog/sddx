@@ -1,0 +1,51 @@
+scenario: activation_succeeds
+narrative: "First charge succeeds on the first attempt; subscription activates."
+
+setup:
+  - create: SubscriptionLifecycle("sub_1")
+    context:
+      subscription_id: "sub_1"
+      customer_id: "cust_1"
+      plan_id: "pro_monthly"
+      amount: 29.99
+      billing_period_days: 30
+  - create: OperationLog("sub_1")
+    context:
+      subscription_id: "sub_1"
+      entries: []
+  - create: FakePaymentProvider("provider")
+    context:
+      outcomes: ["succeed"]
+      served: 0
+  - create: PaymentAttempt("sub_1:cycle1")
+    context:
+      retry_id: "sub_1:cycle1"
+      subscription_id: "sub_1"
+      cycle: 1
+      amount: 29.99
+      max_attempts: 3
+      base_delay: 60.0
+      attempts: 0
+
+steps:
+  - fire: PaymentAttempt("sub_1:cycle1").start
+
+expect:
+  states:
+    SubscriptionLifecycle("sub_1"): active
+    PaymentAttempt("sub_1:cycle1"): succeeded
+    FakePaymentProvider("provider"): ready
+  events_emitted:
+    - retry.attempt_requested
+    - payment.captured
+    - retry.succeeded
+    - subscription.activated
+  events_not_emitted:
+    - payment.declined
+    - retry.exhausted
+    - subscription.suspended
+  context:
+    SubscriptionLifecycle("sub_1"):
+      subscription_id: "sub_1"
+    FakePaymentProvider("provider"):
+      served: 1

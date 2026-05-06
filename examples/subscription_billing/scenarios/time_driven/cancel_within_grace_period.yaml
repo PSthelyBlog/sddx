@@ -1,0 +1,57 @@
+scenario: cancel_within_grace_period
+narrative: "User cancels while suspended; grace timer fires later but is harmlessly ignored (cancelled is final)."
+
+setup:
+  - create: SubscriptionLifecycle("sub_1")
+    context:
+      subscription_id: "sub_1"
+      customer_id: "cust_1"
+      plan_id: "pro_monthly"
+      amount: 29.99
+      billing_period_days: 30
+      grace_period_seconds: 604800
+  - create: OperationLog("sub_1")
+    context:
+      subscription_id: "sub_1"
+      entries: []
+  - create: FakePaymentProvider("provider")
+    context:
+      outcomes: ["decline", "decline", "decline"]
+      served: 0
+  - create: PaymentAttempt("sub_1:cycle1")
+    context:
+      retry_id: "sub_1:cycle1"
+      subscription_id: "sub_1"
+      cycle: 1
+      amount: 29.99
+      max_attempts: 3
+      base_delay: 60.0
+      attempts: 0
+
+steps:
+  - fire: PaymentAttempt("sub_1:cycle1").start
+  - advance_time: 61
+  - advance_time: 121
+  - assert:
+      states:
+        SubscriptionLifecycle("sub_1"): suspended
+  - fire: SubscriptionLifecycle("sub_1").cancel
+    args:
+      cancellation_reason: "downgrade_to_free"
+  - assert:
+      states:
+        SubscriptionLifecycle("sub_1"): cancelled
+  - advance_time: { days: 7 }   # grace timer fires; ignored on cancelled
+
+expect:
+  states:
+    SubscriptionLifecycle("sub_1"): cancelled
+    OperationLog("sub_1"): closed
+  events_emitted:
+    - subscription.suspended
+    - subscription.cancelled
+    - subscription.grace_expired   # the timer DOES fire on the bus, but the
+                                    # cancelled state has no churn transition
+                                    # available, so the handler silently no-ops.
+  events_not_emitted:
+    - subscription.churned

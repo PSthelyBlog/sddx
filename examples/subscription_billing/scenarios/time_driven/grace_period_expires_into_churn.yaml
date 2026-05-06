@@ -1,0 +1,50 @@
+scenario: grace_period_expires_into_churn
+narrative: "Suspended subscription with no recovery; grace timer fires; churns."
+
+setup:
+  - create: SubscriptionLifecycle("sub_1")
+    context:
+      subscription_id: "sub_1"
+      customer_id: "cust_1"
+      plan_id: "pro_monthly"
+      amount: 29.99
+      billing_period_days: 30
+      grace_period_seconds: 604800   # 7 days
+  - create: OperationLog("sub_1")
+    context:
+      subscription_id: "sub_1"
+      entries: []
+  - create: FakePaymentProvider("provider")
+    context:
+      outcomes: ["decline", "decline", "decline"]
+      served: 0
+  - create: PaymentAttempt("sub_1:cycle1")
+    context:
+      retry_id: "sub_1:cycle1"
+      subscription_id: "sub_1"
+      cycle: 1
+      amount: 29.99
+      max_attempts: 3
+      base_delay: 60.0
+      attempts: 0
+
+steps:
+  - fire: PaymentAttempt("sub_1:cycle1").start
+  - advance_time: 61
+  - advance_time: 121
+  - assert:
+      states:
+        SubscriptionLifecycle("sub_1"): suspended
+  - advance_time: { days: 7 }   # past grace period
+
+expect:
+  states:
+    SubscriptionLifecycle("sub_1"): churned
+    OperationLog("sub_1"): closed
+  events_emitted:
+    - subscription.suspended
+    - subscription.grace_expired
+    - subscription.churned
+  events_not_emitted:
+    - subscription.activated
+    - subscription.cancelled

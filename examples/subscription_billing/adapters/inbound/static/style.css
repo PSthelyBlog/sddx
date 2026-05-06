@@ -1,0 +1,124 @@
+/* sddx Subscription Billing demo — small overrides on top of Pico. */
+
+:root {
+  --badge-ok-bg:      #16a34a;
+  --badge-warn-bg:    #ca8a04;
+  --badge-bad-bg:     #dc2626;
+  --badge-pending-bg: #2563eb;
+  --badge-muted-bg:   #6b7280;
+}
+
+main.container {
+  max-width: 1100px;
+}
+
+#controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 720px) {
+  #controls { grid-template-columns: 1fr; }
+}
+
+.time-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.time-controls input[type="number"] {
+  width: 6rem;
+  margin: 0;
+}
+
+.time-controls button {
+  margin: 0;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.9rem;
+}
+
+#sub-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+}
+
+.sub-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+.sub-card .muted {
+  font-size: 0.85rem;
+  color: var(--muted-color, #888);
+  margin: 0.3rem 0 0.6rem 0;
+}
+
+.sub-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.sub-actions button {
+  margin: 0;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: white;
+  background: var(--badge-muted-bg);
+}
+
+.badge-ok      { background: var(--badge-ok-bg); }
+.badge-warn    { background: var(--badge-warn-bg); }
+.badge-bad     { background: var(--badge-bad-bg); }
+.badge-pending { background: var(--badge-pending-bg); }
+.badge-muted   { background: var(--badge-muted-bg); }
+
+#event-log {
+  margin-top: 1.5rem;
+}
+
+#event-rows {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  background: var(--card-background-color, #f4f4f5);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  max-height: 26rem;
+  overflow-y: auto;
+}
+
+.event {
+  padding: 0.15rem 0;
+  border-bottom: 1px dashed var(--card-border-color, #e4e4e7);
+}
+
+.event:last-child {
+  border-bottom: none;
+}
+
+.event .t {
+  display: inline-block;
+  width: 5.5rem;
+  color: var(--muted-color, #888);
+}
+
+.event .ev-name {
+  color: var(--primary, #2563eb);
+  font-weight: 500;
+}

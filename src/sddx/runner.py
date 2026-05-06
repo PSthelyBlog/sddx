@@ -292,21 +292,41 @@ class SimulationRunner:
     def advance_time(self, seconds: float) -> list[Event]:
         """Advance virtual time and emit any scheduled events that fired.
 
+        Timers fire at their precise deadlines, in deadline order. The clock
+        is moved to a timer's deadline immediately before the timer is
+        emitted, so any timers scheduled during the cascading event delivery
+        get correct deadlines (relative to when the parent timer "really"
+        fired, not the end of the advance window).
+
         Returns the list of events emitted to the bus during this advance.
         """
-        fired = self._clock.advance(seconds)
+        if seconds < 0:
+            raise ValueError(f"cannot advance backwards (got {seconds}s)")
+        target = self._clock.now() + seconds
         emitted: list[Event] = []
-        now = self._clock.now()
-        for scheduled in fired:
+        while True:
+            # Find the next-due timer with deadline <= target. New timers
+            # scheduled mid-cascade are handled by re-checking on each loop.
+            ready = [s for s in self._clock.pending() if s.deadline <= target]
+            if not ready:
+                break
+            next_fire = min(ready, key=lambda s: s.deadline)
+            # Move the clock forward to the firing deadline before emit so
+            # cascading set_timer calls compute deadlines from the right base.
+            self._clock._now = next_fire.deadline
+            self._clock._scheduled.remove(next_fire)
             event = Event(
-                name=scheduled.event_name,
-                payload=scheduled.payload,
-                source_machine=scheduled.source_machine,
-                source_instance=scheduled.source_instance,
-                timestamp=now,
+                name=next_fire.event_name,
+                payload=next_fire.payload,
+                source_machine=next_fire.source_machine,
+                source_instance=next_fire.source_instance,
+                timestamp=next_fire.deadline,
             )
             self._event_bus.emit(event)
             emitted.append(event)
+        # Settle the clock at the final target if no timers reached it.
+        if self._clock.now() < target:
+            self._clock._now = target
         return emitted
 
     # -- Reset / snapshot --

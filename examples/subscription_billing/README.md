@@ -8,6 +8,7 @@ features the calculator example doesn't:
 - **`runner.snapshot()` / `runner.restore()`** preserving an active session across runner restarts, including pending grace-period timers.
 - **A "real" outbound adapter** (`FakePaymentProvider`) modeled as a state machine so it participates in simulation lifecycle.
 - **Pattern subscriptions** in `OperationLog` for `payment.*` and `retry.*` events.
+- **An HTTP inbound adapter** with a browser-based demo UI (vanilla JS + Pico.css), letting you click through scenarios in real time.
 
 ## Running it
 
@@ -18,9 +19,18 @@ PYTHONPATH=src python -m sddx -C examples/subscription_billing converge
 # Snapshot/restore scenarios (Python rather than YAML)
 PYTHONPATH=src:examples/subscription_billing python \
     examples/subscription_billing/scenarios/persistence/test_snapshot_restore.py
+
+# HTTP API + demo UI (default port 8080)
+PYTHONPATH=src:examples/subscription_billing python \
+    examples/subscription_billing/adapters/inbound/http_api.py
+# Then open http://localhost:8080/ in a browser.
+
+# HTTP adapter unit tests (handlers tested without HTTP)
+PYTHONPATH=src:examples/subscription_billing pytest \
+    examples/subscription_billing/adapters/inbound/test_http_api.py
 ```
 
-Expected: `9/9 scenarios converged`, 7 invariants × 9 = 63 invariant checks all pass; both snapshot/restore tests pass.
+Expected: `9/9 scenarios converged`, 7 invariants × 9 = 63 invariant checks all pass; both snapshot/restore tests pass; 14 adapter tests pass.
 
 ## Domain decomposition
 
@@ -92,6 +102,53 @@ event-only coupling: the event payload has to carry enough info for every
 subscriber to find its instance, but no machine needs a direct reference
 to any other.
 
+## HTTP adapter + demo UI
+
+`adapters/inbound/http_api.py` is a thin HTTP wrapper over the runner. It
+follows the SDD adapter contract: pure handler functions translate parsed
+request payloads into `runner.fire(...)` calls and return `(status, body)`
+tuples; an `http.server`-based wrapper turns those into HTTP responses.
+Zero external dependencies — uses only the Python standard library plus
+[Pico.css](https://picocss.com/) loaded from a CDN for the UI.
+
+### Endpoints
+
+| Method | Path | Handler |
+|---|---|---|
+| `GET`    | `/subscriptions`                | List all subscriptions with state and cycle count |
+| `POST`   | `/subscriptions`                | Create + run first PaymentAttempt |
+| `GET`    | `/subscriptions/{id}`           | Read state, context, cycles |
+| `DELETE` | `/subscriptions/{id}`           | Fire `cancel` |
+| `POST`   | `/subscriptions/{id}/cycles`    | Start the next billing cycle |
+| `GET`    | `/events`                       | Recent events (`?since=N&limit=M`) |
+| `GET`    | `/clock`                        | Virtual clock state + pending timers |
+| `POST`   | `/admin/advance_time`           | Drive `runner.advance_time(seconds)` — the demo's killer feature |
+| `GET`    | `/`, `/static/...`              | Demo UI (HTML/JS/CSS) |
+
+### What the UI shows
+
+- Cards for each subscription with current state, plan, amount, and cycle count.
+- Per-card actions: **Bill now** (start a new cycle), **Cancel**.
+- A **virtual clock** panel: current `t`, pending-timer count, and buttons for `+1 min / +1 hour / +1 day / +7 days` plus a custom `N seconds` input. This is the demo's centerpiece — most demos can't visualize "skip ahead 7 days and watch the suspended subscription churn."
+- An **event log** scrolling the last 30 events with virtual timestamps.
+
+The page polls the API once per second (no WebSockets, no SSE) so updates
+appear within ~1s of any change.
+
+### Adapter design notes
+
+- The `outcomes` field on `POST /subscriptions` and `POST /cycles` is an
+  array of `"succeed" | "decline"` that gets appended to the
+  `FakePaymentProvider`'s scripted-response queue. This is fixture-style
+  injection — useful for the demo, replaced in production by a real
+  payment-processor adapter.
+- The shared `FakePaymentProvider("provider")` instance is created once
+  during runner construction. Cycle instance ids encode subscription +
+  cycle number (`sub_1:cycle3`); the resolver in `sddx_project.py` maps
+  events back to the right machine.
+- Adapter handlers are tested as pure functions in
+  [test_http_api.py](adapters/inbound/test_http_api.py) — 14 tests, no HTTP roundtrips.
+
 ## What this example demonstrates that the calculator doesn't
 
 | Feature | Where to look |
@@ -104,3 +161,5 @@ to any other.
 | Outbound adapter as a state machine | [machines/fake_payment_provider.py](machines/fake_payment_provider.py) |
 | Resolver-with-fallback for cross-cutting events | [sddx_project.py](sddx_project.py) |
 | Whole-runner snapshot/restore | [scenarios/persistence/test_snapshot_restore.py](scenarios/persistence/test_snapshot_restore.py) |
+| HTTP inbound adapter | [adapters/inbound/http_api.py](adapters/inbound/http_api.py) |
+| Browser-based demo UI | [adapters/inbound/static/index.html](adapters/inbound/static/index.html) |

@@ -166,6 +166,50 @@ def test_pattern_subscription_wired_by_runner():
     assert r.get(Listener, "L1").current_state == "heard"
 
 
+def test_advance_time_cascading_timers_fire_in_order():
+    """Timers scheduled mid-cascade should fire if their deadline (relative
+    to the parent timer's actual firing time) falls within the advance window.
+    """
+    class Pinger(StateMachine):
+        idle = State(initial=True)
+        ticking = State()
+        done = State(final=True)
+
+        start_ticking = idle.to(ticking)
+        tick = ticking.loop() | ticking.to(done)
+
+        def guard_tick_to_done(self, **kw):
+            return self._context.get("ticks", 0) + 1 >= self._context.get("target", 1)
+
+        def guard_tick_to_ticking(self, **kw):
+            return self._context.get("ticks", 0) + 1 < self._context.get("target", 1)
+
+        def on_transition_start_ticking(self):
+            self.set_timer("pinger.tick", 10.0, {"id": self._instance_id})
+
+        def on_transition_tick(self):
+            self._context["ticks"] = self._context.get("ticks", 0) + 1
+            # Schedule the NEXT tick — this is the cascading timer case.
+            if self._context["ticks"] < self._context.get("target", 1):
+                self.set_timer("pinger.tick", 10.0, {"id": self._instance_id})
+
+        @classmethod
+        def subscriptions(cls):
+            return {"pinger.tick": "tick"}
+
+    r = SimulationRunner()
+    r.register(Pinger)
+    r.register_resolver(Pinger, lambda e: e.payload.get("id", ""))
+    r.create(Pinger, "P1", {"target": 5, "ticks": 0})
+    r.fire("P1", Pinger, "start_ticking")
+
+    # First tick at t=10, then 20, 30, 40, 50. Advance 100s should fire all.
+    r.advance_time(100.0)
+    assert r.get(Pinger, "P1").current_state == "done"
+    assert r.get(Pinger, "P1").context["ticks"] == 5
+    assert r.clock.now() == 100.0
+
+
 def test_advance_time_fires_scheduled_events():
     class Scheduler(StateMachine):
         idle = State(initial=True)

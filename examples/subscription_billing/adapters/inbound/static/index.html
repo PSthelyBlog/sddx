@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>sddx — Subscription Billing Demo</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="container">
+    <header>
+      <hgroup>
+        <h1>sddx Subscription Billing</h1>
+        <p>A live demo of the <code>examples/subscription_billing</code> machines.
+        Drive virtual time to watch retries, suspensions, and churn play out.</p>
+      </hgroup>
+    </header>
+
+    <section id="controls" aria-label="Controls">
+      <article>
+        <header><strong>Virtual clock</strong></header>
+        <p>t = <code id="clock-now">0.0</code> s &nbsp;
+           pending timers: <code id="clock-pending">0</code></p>
+        <div class="time-controls">
+          <input type="number" id="advance-seconds" value="60" min="0" step="1">
+          <button id="advance-custom">Advance N s</button>
+          <button class="advance-preset" data-seconds="60">+1 min</button>
+          <button class="advance-preset" data-seconds="3600">+1 hour</button>
+          <button class="advance-preset" data-seconds="86400">+1 day</button>
+          <button class="advance-preset" data-seconds="604800">+7 days</button>
+        </div>
+      </article>
+
+      <article>
+        <header><strong>New subscription</strong></header>
+        <form id="new-sub">
+          <div class="grid">
+            <label>ID
+              <input type="text" id="new-sub-id" placeholder="sub_1" required>
+            </label>
+            <label>Plan
+              <input type="text" id="new-sub-plan" value="pro_monthly">
+            </label>
+            <label>Amount
+              <input type="number" id="new-sub-amount" value="29.99" step="0.01">
+            </label>
+          </div>
+          <label>Outcome script
+            <select id="new-sub-outcomes">
+              <option value="succeed">Succeed first try (happy path)</option>
+              <option value="decline,succeed">1 decline, then succeed</option>
+              <option value="decline,decline,succeed">2 declines, then succeed</option>
+              <option value="decline,decline,decline">3 declines (will exhaust)</option>
+            </select>
+          </label>
+          <button type="submit">Create &amp; charge</button>
+        </form>
+      </article>
+    </section>
+
+    <section id="subs" aria-label="Subscriptions">
+      <h2>Subscriptions</h2>
+      <div id="sub-list"><p><em>None yet — create one above.</em></p></div>
+    </section>
+
+    <section id="event-log" aria-label="Event log">
+      <h2>Event log <small>(last 30)</small></h2>
+      <div id="event-rows"><p><em>No events.</em></p></div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
